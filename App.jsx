@@ -5,15 +5,15 @@ import axios from 'axios';
 const API_URL = 'https://mxrollover-backend-jpyd.onrender.com';
 
 // Retry policy (adjustable)
-const API_RETRIES = 20;       // number of retry attempts
-const API_RETRY_DELAY = 3000; // ms between attempts
-const AXIOS_TIMEOUT = 170000; // ms timeout for axios request (170s to match server timeout)
+const API_RETRIES = 20;       
+const API_RETRY_DELAY = 3000; 
+const AXIOS_TIMEOUT = 170000; 
 
 function App() {
   // Navigation & Tab Switch State
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Customization & Settings States (rebuilding your localStorage caching logic)
+  // Customization & Settings States
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showSettingsAccordion, setShowSettingsAccordion] = useState(false);
   const [username, setUsername] = useState(() => localStorage.getItem('userProfileUsername') || 'Savings User');
@@ -42,7 +42,6 @@ function App() {
 
   // ======================================================================
   // Helper: axios request with retries (handles backend cold-starts)
-  // Usage: await axiosRequestWithRetries({ method:'post', url:`${API_URL}/...`, data: {...} })
   // ======================================================================
   const axiosRequestWithRetries = async (config, retries = API_RETRIES) => {
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -56,9 +55,8 @@ function App() {
       } catch (err) {
         const status = err.response?.status;
         const message = err.message || '';
-        // Determine if error is retryable:
         const retryable = (
-          !err.response // network-level error (DNS, refused, etc.)
+          !err.response 
           || message.includes('Network Error')
           || message.includes('timeout')
           || message.includes('ECONNREFUSED')
@@ -67,29 +65,23 @@ function App() {
           || (status >= 500 && status < 600)
         );
 
-        // If last attempt or not retryable -> throw
         if (attempt === retries || !retryable) {
           throw err;
         }
 
-        // Wait then retry
         await new Promise(r => setTimeout(r, API_RETRY_DELAY));
       }
     }
-    // Should never reach here
     throw new Error('Retries exhausted');
   };
 
-  // Fetch rollovers (with retries) - Note: Since login is removed, no token is sent unless one exists
+  // Fetch rollovers (with retries)
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('userToken'); // Can be null
       const res = await axiosRequestWithRetries({
         method: 'get',
         url: `${API_URL}/api/rollovers`,
-        // Only send headers if token exists
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
 
       setRolloverRuns(res.data);
@@ -109,6 +101,10 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   // Sync profile customizations back to localStorage on change
   const handleUsernameChange = (e) => {
     const val = e.target.value;
@@ -119,7 +115,7 @@ function App() {
   const handleThemeChange = (e) => {
     const selectedTheme = e.target.value;
     setTheme(selectedTheme);
-    setBgImage(null); // Clear custom background so solid color theme displays
+    setBgImage(null);
     localStorage.setItem('userProfileTheme', selectedTheme);
     localStorage.setItem('useCustomBgActive', 'false');
   };
@@ -149,7 +145,7 @@ function App() {
     }
   };
 
-  // Accumulator Appender logic mirroring your original arrays
+  // Accumulator Appender logic
   const handleAppendMatch = (e) => {
     e.preventDefault();
     if (!homeTeam || !awayTeam || !prediction || isNaN(parseFloat(matchOdd))) {
@@ -181,7 +177,6 @@ function App() {
     const finalStake = parseFloat(baseStake) || 1000;
 
     try {
-      const token = localStorage.getItem('userToken'); // Can be null
       await axiosRequestWithRetries({
         method: 'post',
         url: `${API_URL}/api/rollovers`,
@@ -190,9 +185,7 @@ function App() {
           target_goal: "1M Goal",
           initial_stake: finalStake,
           base_odds: parseFloat(accumulatedOdds.toFixed(2))
-        },
-        // Only send headers if token exists
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        }
       });
 
       setStagedMatches([]);
@@ -213,13 +206,10 @@ function App() {
     else if (currentStatus === 'win') nextStatus = 'loss';
 
     try {
-      const token = localStorage.getItem('userToken'); // Can be null
       await axiosRequestWithRetries({
         method: 'put',
         url: `${API_URL}/api/bets/${betId}`,
-        data: { status: nextStatus },
-        // Only send headers if token exists
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        data: { status: nextStatus }
       });
       fetchData(); // Trigger fresh database sync
     } catch (err) {
@@ -234,7 +224,7 @@ function App() {
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
 
-  // ==== REST OF YOUR APP (UNTOUCHED) ====
+  // ==== MAIN APP (No Login) ====
   return (
     <div 
       className={`theme-container theme-${theme}`} 
@@ -505,7 +495,6 @@ function App() {
                   <p style={{ color: '#64748b', textAlign: 'center', padding: '20px', fontSize: '0.85rem' }}>No historical data records verified yet.</p>
                 ) : (
                   rolloverRuns.map(run => {
-                    // Filter down won/lost steps to present a clean archival summary card
                     const settledSteps = run.steps ? run.steps.filter(s => s.status === 'win' || s.status === 'loss') : [];
                     return (
                       <div className="history-dropdown-card" key={run.id}>
