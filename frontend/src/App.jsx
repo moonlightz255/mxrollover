@@ -8,9 +8,8 @@ function App() {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('userToken'));
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
   const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
   const [authConfirmPassword, setAuthConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
@@ -58,7 +57,7 @@ function App() {
     setAuthError('');
     setAuthLoading(true);
 
-    if (!authEmail || !authPassword) {
+    if (!authUsername || !authPassword) {
       setAuthError('Please fill in all fields');
       setAuthLoading(false);
       return;
@@ -66,7 +65,7 @@ function App() {
 
     try {
       const res = await axios.post(`${API_URL}/api/auth/login`, {
-        email: authEmail,
+        username: authUsername,
         password: authPassword
       });
       
@@ -74,7 +73,7 @@ function App() {
       localStorage.setItem('userProfileUsername', res.data.username);
       setUsername(res.data.username);
       setIsAuthenticated(true);
-      setAuthEmail('');
+      setAuthUsername('');
       setAuthPassword('');
       setAuthLoading(false);
     } catch (err) {
@@ -89,7 +88,7 @@ function App() {
     setAuthError('');
     setAuthLoading(true);
 
-    if (!authEmail || !authPassword || !authConfirmPassword || !authUsername) {
+    if (!authUsername || !authPassword || !authConfirmPassword) {
       setAuthError('Please fill in all fields');
       setAuthLoading(false);
       return;
@@ -115,19 +114,17 @@ function App() {
 
     try {
       const res = await axios.post(`${API_URL}/api/auth/register`, {
-        email: authEmail,
-        password: authPassword,
-        username: authUsername
+        username: authUsername,
+        password: authPassword
       });
       
       localStorage.setItem('userToken', res.data.token);
       localStorage.setItem('userProfileUsername', res.data.username);
       setUsername(res.data.username);
       setIsAuthenticated(true);
-      setAuthEmail('');
+      setAuthUsername('');
       setAuthPassword('');
       setAuthConfirmPassword('');
-      setAuthUsername('');
       setAuthLoading(false);
     } catch (err) {
       setAuthError(err.response?.data?.error || 'Registration failed. Please try again.');
@@ -139,10 +136,9 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('userToken');
     setIsAuthenticated(false);
-    setAuthEmail('');
+    setAuthUsername('');
     setAuthPassword('');
     setAuthConfirmPassword('');
-    setAuthUsername('');
     setAuthError('');
     setActiveTab('dashboard');
   };
@@ -297,7 +293,7 @@ function App() {
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
 
-  // Authentication Screen
+  // Authentication Screen with Beautiful Gradient
   if (!isAuthenticated) {
     return (
       <div style={{
@@ -305,108 +301,201 @@ function App() {
         justifyContent: 'center',
         alignItems: 'center',
         minHeight: '100vh',
-        backgroundColor: '#f8fafc',
-        fontFamily: 'Arial, sans-serif'
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        fontFamily: 'Arial, sans-serif',
+        padding: '20px'
       }}>
+        {/* Animated background circles */}
         <div style={{
-          backgroundColor: 'white',
-          padding: '40px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          width: '100%',
-          maxWidth: '400px'
-        }}>
-          <h1 style={{ textAlign: 'center', marginBottom: '30px', color: '#1e293b' }}>
-            <i className="fa-regular fa-circle-dot"></i> MxRollover
-          </h1>
+          position: 'fixed',
+          top: '-50%',
+          left: '-50%',
+          width: '200%',
+          height: '200%',
+          background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+          animation: 'float 20s infinite',
+          pointerEvents: 'none'
+        }} />
+        <div style={{
+          position: 'fixed',
+          bottom: '-50%',
+          right: '-50%',
+          width: '200%',
+          height: '200%',
+          background: 'radial-gradient(circle at 70% 50%, rgba(255,255,255,0.08) 0%, transparent 50%)',
+          animation: 'float 25s infinite reverse',
+          pointerEvents: 'none'
+        }} />
 
-          <div style={{ display: 'flex', marginBottom: '20px', gap: '10px' }}>
+        <div style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)',
+          padding: '45px 40px',
+          borderRadius: '20px',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+          width: '100%',
+          maxWidth: '420px',
+          position: 'relative',
+          zIndex: 1,
+          animation: 'slideUp 0.5s ease-out'
+        }}>
+          {/* Logo/Brand */}
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <div style={{
+              width: '70px',
+              height: '70px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 15px',
+              fontSize: '30px',
+              color: 'white',
+              boxShadow: '0 10px 30px rgba(102, 126, 234, 0.4)'
+            }}>
+              <i className="fa-regular fa-circle-dot"></i>
+            </div>
+            <h1 style={{ 
+              margin: 0, 
+              fontSize: '28px', 
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+              MxRollover
+            </h1>
+            <p style={{ 
+              margin: '5px 0 0', 
+              color: '#94a3b8', 
+              fontSize: '14px',
+              fontWeight: '300'
+            }}>
+              {authMode === 'login' ? 'Welcome back!' : 'Create your account'}
+            </p>
+          </div>
+
+          {/* Toggle Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            marginBottom: '25px', 
+            gap: '10px',
+            background: '#f1f5f9',
+            padding: '5px',
+            borderRadius: '12px'
+          }}>
             <button
               onClick={() => { setAuthMode('login'); setAuthError(''); }}
               style={{
                 flex: 1,
-                padding: '10px',
-                backgroundColor: authMode === 'login' ? '#2563eb' : '#e2e8f0',
+                padding: '12px',
+                background: authMode === 'login' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
                 color: authMode === 'login' ? 'white' : '#64748b',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 cursor: 'pointer',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                fontSize: '15px',
+                transition: 'all 0.3s ease',
+                boxShadow: authMode === 'login' ? '0 4px 15px rgba(102, 126, 234, 0.4)' : 'none'
               }}
             >
+              <i className="fas fa-sign-in-alt" style={{ marginRight: '8px' }}></i>
               Login
             </button>
             <button
               onClick={() => { setAuthMode('register'); setAuthError(''); }}
               style={{
                 flex: 1,
-                padding: '10px',
-                backgroundColor: authMode === 'register' ? '#2563eb' : '#e2e8f0',
+                padding: '12px',
+                background: authMode === 'register' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
                 color: authMode === 'register' ? 'white' : '#64748b',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 cursor: 'pointer',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                fontSize: '15px',
+                transition: 'all 0.3s ease',
+                boxShadow: authMode === 'register' ? '0 4px 15px rgba(102, 126, 234, 0.4)' : 'none'
               }}
             >
+              <i className="fas fa-user-plus" style={{ marginRight: '8px' }}></i>
               Register
             </button>
           </div>
 
+          {/* Error Message */}
           {authError && (
             <div style={{
-              backgroundColor: '#fee2e2',
-              color: '#dc2626',
-              padding: '10px',
-              borderRadius: '4px',
+              background: 'linear-gradient(135deg, #fecaca 0%, #fca5a5 100%)',
+              color: '#991b1b',
+              padding: '12px 15px',
+              borderRadius: '10px',
               marginBottom: '20px',
-              fontSize: '0.9rem'
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              border: '1px solid #f87171'
             }}>
-              {authError}
+              <i className="fas fa-exclamation-circle"></i>
+              <span>{authError}</span>
             </div>
           )}
 
+          {/* Auth Form */}
           <form onSubmit={authMode === 'login' ? handleLogin : handleRegister}>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', color: '#475569', fontWeight: 'bold' }}>Email</label>
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '6px', 
+                color: '#334155', 
+                fontWeight: '600',
+                fontSize: '14px'
+              }}>
+                <i className="fas fa-user" style={{ marginRight: '8px', color: '#667eea' }}></i>
+                Username
+              </label>
               <input
-                type="email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="Enter your email"
+                type="text"
+                value={authUsername}
+                onChange={(e) => setAuthUsername(e.target.value)}
+                placeholder="Enter your username"
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
+                  padding: '12px 15px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '10px',
                   fontSize: '1rem',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  transition: 'all 0.3s ease',
+                  background: '#f8fafc',
+                  outline: 'none'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#667eea';
+                  e.target.style.background = 'white';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.background = '#f8fafc';
                 }}
               />
             </div>
 
-            {authMode === 'register' && (
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', color: '#475569', fontWeight: 'bold' }}>Username</label>
-                <input
-                  type="text"
-                  value={authUsername}
-                  onChange={(e) => setAuthUsername(e.target.value)}
-                  placeholder="Choose a username"
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    fontSize: '1rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-            )}
-
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', color: '#475569', fontWeight: 'bold' }}>Password</label>
+            <div style={{ marginBottom: authMode === 'register' ? '18px' : '25px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '6px', 
+                color: '#334155', 
+                fontWeight: '600',
+                fontSize: '14px'
+              }}>
+                <i className="fas fa-lock" style={{ marginRight: '8px', color: '#667eea' }}></i>
+                Password
+              </label>
               <input
                 type="password"
                 value={authPassword}
@@ -414,18 +503,38 @@ function App() {
                 placeholder="Enter your password"
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
+                  padding: '12px 15px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '10px',
                   fontSize: '1rem',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  transition: 'all 0.3s ease',
+                  background: '#f8fafc',
+                  outline: 'none'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#667eea';
+                  e.target.style.background = 'white';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.background = '#f8fafc';
                 }}
               />
             </div>
 
             {authMode === 'register' && (
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', color: '#475569', fontWeight: 'bold' }}>Confirm Password</label>
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '6px', 
+                  color: '#334155', 
+                  fontWeight: '600',
+                  fontSize: '14px'
+                }}>
+                  <i className="fas fa-check-circle" style={{ marginRight: '8px', color: '#667eea' }}></i>
+                  Confirm Password
+                </label>
                 <input
                   type="password"
                   value={authConfirmPassword}
@@ -433,11 +542,22 @@ function App() {
                   placeholder="Confirm your password"
                   style={{
                     width: '100%',
-                    padding: '10px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
+                    padding: '12px 15px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '10px',
                     fontSize: '1rem',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    background: '#f8fafc',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#667eea';
+                    e.target.style.background = 'white';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e2e8f0';
+                    e.target.style.background = '#f8fafc';
                   }}
                 />
               </div>
@@ -448,24 +568,109 @@ function App() {
               disabled={authLoading}
               style={{
                 width: '100%',
-                padding: '12px',
-                backgroundColor: authLoading ? '#cbd5e1' : '#2563eb',
+                padding: '14px',
+                background: authLoading 
+                  ? '#cbd5e1' 
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
-                fontSize: '1rem',
+                borderRadius: '10px',
+                fontSize: '16px',
                 fontWeight: 'bold',
-                cursor: authLoading ? 'not-allowed' : 'pointer'
+                cursor: authLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                if (!authLoading) {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!authLoading) {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                }
               }}
             >
-              {authLoading ? 'Processing...' : authMode === 'login' ? 'Login' : 'Register'}
+              {authLoading ? (
+                <>
+                  <i className="fas fa-spinner fa-spin" style={{ marginRight: '10px' }}></i>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {authMode === 'login' ? (
+                    <>
+                      <i className="fas fa-sign-in-alt" style={{ marginRight: '10px' }}></i>
+                      Login
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-user-plus" style={{ marginRight: '10px' }}></i>
+                      Create Account
+                    </>
+                  )}
+                </>
+              )}
             </button>
+
+            {/* Switch mode link */}
+            <div style={{ textAlign: 'center', marginTop: '18px' }}>
+              <span style={{ color: '#94a3b8', fontSize: '14px' }}>
+                {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
+                <span
+                  onClick={() => {
+                    setAuthMode(authMode === 'login' ? 'register' : 'login');
+                    setAuthError('');
+                  }}
+                  style={{
+                    color: '#667eea',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    transition: 'color 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = '#764ba2'}
+                  onMouseLeave={(e) => e.target.style.color = '#667eea'}
+                >
+                  {authMode === 'login' ? 'Sign Up' : 'Sign In'}
+                </span>
+              </span>
+            </div>
           </form>
         </div>
+
+        {/* CSS Animations */}
+        <style>
+          {`
+            @keyframes float {
+              0% { transform: translate(0, 0) rotate(0deg); }
+              33% { transform: translate(10%, -10%) rotate(5deg); }
+              66% { transform: translate(-5%, 5%) rotate(-3deg); }
+              100% { transform: translate(0, 0) rotate(0deg); }
+            }
+            
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+          `}
+        </style>
       </div>
     );
   }
 
+  // ==== REST OF YOUR APP (UNTOUCHED) ====
   return (
     <div 
       className={`theme-container theme-${theme}`} 
