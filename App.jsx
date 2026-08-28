@@ -5,15 +5,24 @@ import axios from 'axios';
 const API_URL = 'https://mxrollover-backend-jpyd.onrender.com';
 
 // Retry policy (adjustable)
-const API_RETRIES = 20;       
-const API_RETRY_DELAY = 3000; 
-const AXIOS_TIMEOUT = 170000; 
+const API_RETRIES = 20;       // number of retry attempts
+const API_RETRY_DELAY = 3000; // ms between attempts
+const AXIOS_TIMEOUT = 170000; // ms timeout for axios request (170s to match server timeout)
 
 function App() {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('userToken'));
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register' (kept for backward compatibility)
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
   // Navigation & Tab Switch State
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Customization & Settings States
+  // Customization & Settings States (rebuilding your localStorage caching logic)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showSettingsAccordion, setShowSettingsAccordion] = useState(false);
   const [username, setUsername] = useState(() => localStorage.getItem('userProfileUsername') || 'Savings User');
@@ -42,6 +51,7 @@ function App() {
 
   // ======================================================================
   // Helper: axios request with retries (handles backend cold-starts)
+  // Usage: await axiosRequestWithRetries({ method:'post', url:`${API_URL}/...`, data: {...} })
   // ======================================================================
   const axiosRequestWithRetries = async (config, retries = API_RETRIES) => {
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -55,8 +65,9 @@ function App() {
       } catch (err) {
         const status = err.response?.status;
         const message = err.message || '';
+        // Determine if error is retryable:
         const retryable = (
-          !err.response 
+          !err.response // network-level error (DNS, refused, etc.)
           || message.includes('Network Error')
           || message.includes('timeout')
           || message.includes('ECONNREFUSED')
@@ -65,23 +76,141 @@ function App() {
           || (status >= 500 && status < 600)
         );
 
+        // If last attempt or not retryable -> throw
         if (attempt === retries || !retryable) {
           throw err;
         }
 
+        // Optional: update UI about retrying (only for auth flows)
+        if (config._updateRetryStatus) {
+          try {
+            config._updateRetryStatus(attempt + 1, retries);
+          } catch (_) {}
+        }
+
+        // Wait then retry
         await new Promise(r => setTimeout(r, API_RETRY_DELAY));
       }
     }
+    // Should never reach here
     throw new Error('Retries exhausted');
+  };
+
+  // Load database entries on mount if authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [isAuthenticated]);
+
+  // Handle Login
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    if (!authUsername || !authPassword) {
+      setAuthError('Please fill in all fields');
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      // pass an updater to show retry attempt info if you want
+      const res = await axiosRequestWithRetries({
+        method: 'post',
+        url: `${API_URL}/api/auth/login`,
+        data: { username: authUsername, password: authPassword },
+        _updateRetryStatus: (attempt, max) => setAuthError(`Waiting for backend... attempt ${attempt}/${max}`)
+      });
+
+      localStorage.setItem('userToken', res.data.token);
+      localStorage.setItem('userProfileUsername', res.data.username);
+      setUsername(res.data.username);
+      setIsAuthenticated(true);
+      setAuthUsername('');
+      setAuthPassword('');
+      setAuthLoading(false);
+      setAuthError('');
+    } catch (err) {
+      setAuthError(err.response?.data?.error || 'Login failed. Please try again.');
+      setAuthLoading(false);
+    }
+  };
+
+  // Handle Register
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    if (!authUsername || !authPassword || !authConfirmPassword) {
+      setAuthError('Please fill in all fields');
+      setAuthLoading(false);
+      return;
+    }
+
+    if (authPassword !== authConfirmPassword) {
+      setAuthError('Passwords do not match');
+      setAuthLoading(false);
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      setAuthError('Password must be at least 6 characters');
+      setAuthLoading(false);
+      return;
+    }
+
+    if (authUsername.length < 3) {
+      setAuthError('Username must be at least 3 characters');
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      const res = await axiosRequestWithRetries({
+        method: 'post',
+        url: `${API_URL}/api/auth/register`,
+        data: { username: authUsername, password: authPassword },
+        _updateRetryStatus: (attempt, max) => setAuthError(`Waiting for backend... attempt ${attempt}/${max}`)
+      });
+
+      localStorage.setItem('userToken', res.data.token);
+      localStorage.setItem('userProfileUsername', res.data.username);
+      setUsername(res.data.username);
+      setIsAuthenticated(true);
+      setAuthUsername('');
+      setAuthPassword('');
+      setAuthConfirmPassword('');
+      setAuthLoading(false);
+      setAuthError('');
+    } catch (err) {
+      setAuthError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setAuthLoading(false);
+    }
+  };
+
+  // Handle Logout
+  const handleLogout = () => {
+    localStorage.removeItem('userToken');
+    setIsAuthenticated(false);
+    setAuthUsername('');
+    setAuthPassword('');
+    setAuthConfirmPassword('');
+    setAuthError('');
+    setActiveTab('dashboard');
   };
 
   // Fetch rollovers (with retries)
   const fetchData = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('userToken');
       const res = await axiosRequestWithRetries({
         method: 'get',
         url: `${API_URL}/api/rollovers`,
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       setRolloverRuns(res.data);
@@ -101,10 +230,6 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   // Sync profile customizations back to localStorage on change
   const handleUsernameChange = (e) => {
     const val = e.target.value;
@@ -115,7 +240,7 @@ function App() {
   const handleThemeChange = (e) => {
     const selectedTheme = e.target.value;
     setTheme(selectedTheme);
-    setBgImage(null);
+    setBgImage(null); // Clear custom background so solid color theme displays
     localStorage.setItem('userProfileTheme', selectedTheme);
     localStorage.setItem('useCustomBgActive', 'false');
   };
@@ -145,7 +270,7 @@ function App() {
     }
   };
 
-  // Accumulator Appender logic
+  // Accumulator Appender logic mirroring your original arrays
   const handleAppendMatch = (e) => {
     e.preventDefault();
     if (!homeTeam || !awayTeam || !prediction || isNaN(parseFloat(matchOdd))) {
@@ -177,6 +302,7 @@ function App() {
     const finalStake = parseFloat(baseStake) || 1000;
 
     try {
+      const token = localStorage.getItem('userToken');
       await axiosRequestWithRetries({
         method: 'post',
         url: `${API_URL}/api/rollovers`,
@@ -185,7 +311,8 @@ function App() {
           target_goal: "1M Goal",
           initial_stake: finalStake,
           base_odds: parseFloat(accumulatedOdds.toFixed(2))
-        }
+        },
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       setStagedMatches([]);
@@ -206,10 +333,12 @@ function App() {
     else if (currentStatus === 'win') nextStatus = 'loss';
 
     try {
+      const token = localStorage.getItem('userToken');
       await axiosRequestWithRetries({
         method: 'put',
         url: `${API_URL}/api/bets/${betId}`,
-        data: { status: nextStatus }
+        data: { status: nextStatus },
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       fetchData(); // Trigger fresh database sync
     } catch (err) {
@@ -224,7 +353,12 @@ function App() {
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
 
-  // ==== MAIN APP (No Login) ====
+  // NOTE: authentication UI (login/register form) has been removed as requested.
+  // The app will always render the main application UI. Authentication still
+  // relies on `userToken` in localStorage. If you need a login flow later,
+  // re-enable the form or provide another auth mechanism.
+
+  // ==== REST OF YOUR APP (UNTOUCHED) ====
   return (
     <div 
       className={`theme-container theme-${theme}`} 
@@ -336,7 +470,7 @@ function App() {
 
                     <div className="dropdown-divider"></div>
 
-                    <a href="#logout" onClick={() => { setShowProfileDropdown(false); }} style={{ color: '#dc2626' }}>
+                    <a href="#logout" onClick={() => { handleLogout(); setShowProfileDropdown(false); }} style={{ color: '#dc2626' }}>
                       <i className="fas fa-sign-out-alt"></i> Logout
                     </a>
                   </div>
@@ -495,6 +629,7 @@ function App() {
                   <p style={{ color: '#64748b', textAlign: 'center', padding: '20px', fontSize: '0.85rem' }}>No historical data records verified yet.</p>
                 ) : (
                   rolloverRuns.map(run => {
+                    // Filter down won/lost steps to present a clean archival summary card
                     const settledSteps = run.steps ? run.steps.filter(s => s.status === 'win' || s.status === 'loss') : [];
                     return (
                       <div className="history-dropdown-card" key={run.id}>
