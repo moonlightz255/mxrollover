@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 // Change this to your deployed Render backend URL when publishing!
-const API_URL = 'https://mxrollover-backend-pd7s.onrender.com'; 
+const API_URL = 'https://mxrollover-backend-jpyd.onrender.com';
+
+// Retry policy (adjustable)
+const API_RETRIES = 20;       
+const API_RETRY_DELAY = 3000; 
+const AXIOS_TIMEOUT = 170000; 
 
 function App() {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('userToken'));
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+  const [authMode, setAuthMode] = useState('login'); 
   const [authUsername, setAuthUsername] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authConfirmPassword, setAuthConfirmPassword] = useState('');
@@ -17,7 +22,7 @@ function App() {
   // Navigation & Tab Switch State
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Customization & Settings States (rebuilding your localStorage caching logic)
+  // Customization & Settings States
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showSettingsAccordion, setShowSettingsAccordion] = useState(false);
   const [username, setUsername] = useState(() => localStorage.getItem('userProfileUsername') || 'Savings User');
@@ -44,6 +49,47 @@ function App() {
   const [rolloverRuns, setRolloverRuns] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ======================================================================
+  // Helper: axios request with retries (handles backend cold-starts)
+  // ======================================================================
+  const axiosRequestWithRetries = async (config, retries = API_RETRIES) => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const merged = {
+          timeout: AXIOS_TIMEOUT,
+          ...config
+        };
+        const res = await axios(merged);
+        return res;
+      } catch (err) {
+        const status = err.response?.status;
+        const message = err.message || '';
+        const retryable = (
+          !err.response 
+          || message.includes('Network Error')
+          || message.includes('timeout')
+          || message.includes('ECONNREFUSED')
+          || message.includes('ENOTFOUND')
+          || status === 503
+          || (status >= 500 && status < 600)
+        );
+
+        if (attempt === retries || !retryable) {
+          throw err;
+        }
+
+        if (config._updateRetryStatus) {
+          try {
+            config._updateRetryStatus(attempt + 1, retries);
+          } catch (_) {}
+        }
+
+        await new Promise(r => setTimeout(r, API_RETRY_DELAY));
+      }
+    }
+    throw new Error('Retries exhausted');
+  };
+
   // Load database entries on mount if authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -64,11 +110,13 @@ function App() {
     }
 
     try {
-      const res = await axios.post(`${API_URL}/api/auth/login`, {
-        username: authUsername,
-        password: authPassword
+      const res = await axiosRequestWithRetries({
+        method: 'post',
+        url: `${API_URL}/api/auth/login`,
+        data: { username: authUsername, password: authPassword },
+        _updateRetryStatus: (attempt, max) => setAuthError(`Waiting for backend... attempt ${attempt}/${max}`)
       });
-      
+
       localStorage.setItem('userToken', res.data.token);
       localStorage.setItem('userProfileUsername', res.data.username);
       setUsername(res.data.username);
@@ -76,6 +124,7 @@ function App() {
       setAuthUsername('');
       setAuthPassword('');
       setAuthLoading(false);
+      setAuthError('');
     } catch (err) {
       setAuthError(err.response?.data?.error || 'Login failed. Please try again.');
       setAuthLoading(false);
@@ -113,11 +162,13 @@ function App() {
     }
 
     try {
-      const res = await axios.post(`${API_URL}/api/auth/register`, {
-        username: authUsername,
-        password: authPassword
+      const res = await axiosRequestWithRetries({
+        method: 'post',
+        url: `${API_URL}/api/auth/register`,
+        data: { username: authUsername, password: authPassword },
+        _updateRetryStatus: (attempt, max) => setAuthError(`Waiting for backend... attempt ${attempt}/${max}`)
       });
-      
+
       localStorage.setItem('userToken', res.data.token);
       localStorage.setItem('userProfileUsername', res.data.username);
       setUsername(res.data.username);
@@ -126,6 +177,7 @@ function App() {
       setAuthPassword('');
       setAuthConfirmPassword('');
       setAuthLoading(false);
+      setAuthError('');
     } catch (err) {
       setAuthError(err.response?.data?.error || 'Registration failed. Please try again.');
       setAuthLoading(false);
@@ -143,16 +195,19 @@ function App() {
     setActiveTab('dashboard');
   };
 
+  // Fetch rollovers (with retries)
   const fetchData = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('userToken');
-      const res = await axios.get(`${API_URL}/api/rollovers`, {
+      const res = await axiosRequestWithRetries({
+        method: 'get',
+        url: `${API_URL}/api/rollovers`,
         headers: { 'Authorization': `Bearer ${token}` }
       });
+
       setRolloverRuns(res.data);
-      
-      // Automatic Rollover Stake Calculation:
-      // If the most recent active run has winning steps, grab the last won step payout
+
       if (res.data.length > 0) {
         const lastRun = res.data[0];
         const wonSteps = lastRun.steps ? lastRun.steps.filter(s => s.status === 'win') : [];
@@ -163,7 +218,7 @@ function App() {
       }
       setLoading(false);
     } catch (err) {
-      console.error("Backend offline. Connect to Render server.", err);
+      console.error("Backend offline or request failed:", err);
       setLoading(false);
     }
   };
@@ -178,7 +233,7 @@ function App() {
   const handleThemeChange = (e) => {
     const selectedTheme = e.target.value;
     setTheme(selectedTheme);
-    setBgImage(null); // Clear custom background so solid color theme displays
+    setBgImage(null);
     localStorage.setItem('userProfileTheme', selectedTheme);
     localStorage.setItem('useCustomBgActive', 'false');
   };
@@ -208,7 +263,7 @@ function App() {
     }
   };
 
-  // Accumulator Appender logic mirroring your original arrays
+  // Accumulator Appender logic
   const handleAppendMatch = (e) => {
     e.preventDefault();
     if (!homeTeam || !awayTeam || !prediction || isNaN(parseFloat(matchOdd))) {
@@ -220,11 +275,7 @@ function App() {
     const textSelection = `${homeTeam} vs ${awayTeam} (${prediction} @${currentOddsValue})`;
     
     setStagedMatches([...stagedMatches, textSelection]);
-    
-    // Dynamic odds multiplication formula
     setAccumulatedOdds(prev => prev * currentOddsValue);
-
-    // Reset inputs
     setHomeTeam('');
     setAwayTeam('');
     setPrediction('');
@@ -242,26 +293,25 @@ function App() {
     const d = new Date();
     const currentChallengeDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
     const finalStake = parseFloat(baseStake) || 1000;
-    const summaryText = stagedMatches.join(' | ');
 
     try {
       const token = localStorage.getItem('userToken');
-      await axios.post(`${API_URL}/api/rollovers`, {
-        title: `${currentChallengeDate} Run`,
-        target_goal: "1M Goal",
-        initial_stake: finalStake,
-        base_odds: parseFloat(accumulatedOdds.toFixed(2))
-      }, {
+      await axiosRequestWithRetries({
+        method: 'post',
+        url: `${API_URL}/api/rollovers`,
+        data: {
+          title: `${currentChallengeDate} Run`,
+          target_goal: "1M Goal",
+          initial_stake: finalStake,
+          base_odds: parseFloat(accumulatedOdds.toFixed(2))
+        },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      // Reset staging builders
+
       setStagedMatches([]);
       setAccumulatedOdds(1.00);
       setKickOffTime('');
       fetchData();
-      
-      // Navigate to Active Bets
       setActiveTab('goal');
       alert(`Coupon initialized and added to database successfully!`);
     } catch (err) {
@@ -269,7 +319,7 @@ function App() {
     }
   };
 
-  // Toggle dynamic day status changes (pending -> win -> loss -> pending)
+  // Toggle dynamic day status changes
   const handleToggleBetStatus = async (betId, currentStatus) => {
     let nextStatus = 'pending';
     if (currentStatus === 'pending') nextStatus = 'win';
@@ -277,10 +327,13 @@ function App() {
 
     try {
       const token = localStorage.getItem('userToken');
-      await axios.put(`${API_URL}/api/bets/${betId}`, { status: nextStatus }, {
+      await axiosRequestWithRetries({
+        method: 'put',
+        url: `${API_URL}/api/bets/${betId}`,
+        data: { status: nextStatus },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchData(); // Trigger fresh database sync
+      fetchData(); 
     } catch (err) {
       console.error("Status update error", err);
     }
@@ -941,7 +994,6 @@ function App() {
                   <p style={{ color: '#64748b', textAlign: 'center', padding: '20px', fontSize: '0.85rem' }}>No historical data records verified yet.</p>
                 ) : (
                   rolloverRuns.map(run => {
-                    // Filter down won/lost steps to present a clean archival summary card
                     const settledSteps = run.steps ? run.steps.filter(s => s.status === 'win' || s.status === 'loss') : [];
                     return (
                       <div className="history-dropdown-card" key={run.id}>
