@@ -5,14 +5,14 @@ import axios from 'axios';
 const API_URL = 'https://mxrollover-backend-jpyd.onrender.com';
 
 // Retry policy (adjustable)
-const API_RETRIES = 20;       // number of retry attempts
-const API_RETRY_DELAY = 3000; // ms between attempts
-const AXIOS_TIMEOUT = 170000; // ms timeout for axios request (170s to match server timeout)
+const API_RETRIES = 20;       
+const API_RETRY_DELAY = 3000; 
+const AXIOS_TIMEOUT = 170000; 
 
 function App() {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('userToken'));
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register' (kept for backward compatibility)
+  const [authMode, setAuthMode] = useState('login'); 
   const [authUsername, setAuthUsername] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authConfirmPassword, setAuthConfirmPassword] = useState('');
@@ -22,7 +22,7 @@ function App() {
   // Navigation & Tab Switch State
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Customization & Settings States (rebuilding your localStorage caching logic)
+  // Customization & Settings States
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showSettingsAccordion, setShowSettingsAccordion] = useState(false);
   const [username, setUsername] = useState(() => localStorage.getItem('userProfileUsername') || 'Savings User');
@@ -51,7 +51,6 @@ function App() {
 
   // ======================================================================
   // Helper: axios request with retries (handles backend cold-starts)
-  // Usage: await axiosRequestWithRetries({ method:'post', url:`${API_URL}/...`, data: {...} })
   // ======================================================================
   const axiosRequestWithRetries = async (config, retries = API_RETRIES) => {
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -65,9 +64,8 @@ function App() {
       } catch (err) {
         const status = err.response?.status;
         const message = err.message || '';
-        // Determine if error is retryable:
         const retryable = (
-          !err.response // network-level error (DNS, refused, etc.)
+          !err.response 
           || message.includes('Network Error')
           || message.includes('timeout')
           || message.includes('ECONNREFUSED')
@@ -76,23 +74,19 @@ function App() {
           || (status >= 500 && status < 600)
         );
 
-        // If last attempt or not retryable -> throw
         if (attempt === retries || !retryable) {
           throw err;
         }
 
-        // Optional: update UI about retrying (only for auth flows)
         if (config._updateRetryStatus) {
           try {
             config._updateRetryStatus(attempt + 1, retries);
           } catch (_) {}
         }
 
-        // Wait then retry
         await new Promise(r => setTimeout(r, API_RETRY_DELAY));
       }
     }
-    // Should never reach here
     throw new Error('Retries exhausted');
   };
 
@@ -116,7 +110,6 @@ function App() {
     }
 
     try {
-      // pass an updater to show retry attempt info if you want
       const res = await axiosRequestWithRetries({
         method: 'post',
         url: `${API_URL}/api/auth/login`,
@@ -193,13 +186,31 @@ function App() {
 
   // Handle Logout
   const handleLogout = () => {
+    // Clear Authentication
     localStorage.removeItem('userToken');
+    
+    // Clear ALL profile settings
+    localStorage.removeItem('userProfileUsername');
+    localStorage.removeItem('userProfileTheme');
+    localStorage.removeItem('userProfileImage');
+    localStorage.removeItem('userProfileCustomBg');
+    localStorage.removeItem('useCustomBgActive');
+    
+    // Reset States to defaults
+    setUsername('Savings User');
+    setTheme('default');
+    setProfilePic(null);
+    setBgImage(null);
+    setShowProfileDropdown(false);
+    setShowSettingsAccordion(false);
+    setActiveTab('dashboard');
+
+    // Clear auth fields
     setIsAuthenticated(false);
     setAuthUsername('');
     setAuthPassword('');
     setAuthConfirmPassword('');
     setAuthError('');
-    setActiveTab('dashboard');
   };
 
   // Fetch rollovers (with retries)
@@ -240,7 +251,7 @@ function App() {
   const handleThemeChange = (e) => {
     const selectedTheme = e.target.value;
     setTheme(selectedTheme);
-    setBgImage(null); // Clear custom background so solid color theme displays
+    setBgImage(null);
     localStorage.setItem('userProfileTheme', selectedTheme);
     localStorage.setItem('useCustomBgActive', 'false');
   };
@@ -270,7 +281,7 @@ function App() {
     }
   };
 
-  // Accumulator Appender logic mirroring your original arrays
+  // Accumulator Appender logic
   const handleAppendMatch = (e) => {
     e.preventDefault();
     if (!homeTeam || !awayTeam || !prediction || isNaN(parseFloat(matchOdd))) {
@@ -289,7 +300,7 @@ function App() {
     setMatchOdd('');
   };
 
-  // Submit staged coupon to MySQL Database (with retries)
+  // Submit staged coupon to MySQL Database
   const handleGenerateActiveSlip = async (e) => {
     e.preventDefault();
     if (stagedMatches.length === 0) {
@@ -326,7 +337,7 @@ function App() {
     }
   };
 
-  // Toggle dynamic day status changes (pending -> win -> loss -> pending)
+  // Toggle dynamic day status changes
   const handleToggleBetStatus = async (betId, currentStatus) => {
     let nextStatus = 'pending';
     if (currentStatus === 'pending') nextStatus = 'win';
@@ -340,7 +351,7 @@ function App() {
         data: { status: nextStatus },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchData(); // Trigger fresh database sync
+      fetchData(); 
     } catch (err) {
       console.error("Status update error", err);
     }
@@ -353,10 +364,382 @@ function App() {
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
 
-  // NOTE: authentication UI (login/register form) has been removed as requested.
-  // The app will always render the main application UI. Authentication still
-  // relies on `userToken` in localStorage. If you need a login flow later,
-  // re-enable the form or provide another auth mechanism.
+  // Authentication Screen with Beautiful Gradient
+  if (!isAuthenticated) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        fontFamily: 'Arial, sans-serif',
+        padding: '20px'
+      }}>
+        {/* Animated background circles */}
+        <div style={{
+          position: 'fixed',
+          top: '-50%',
+          left: '-50%',
+          width: '200%',
+          height: '200%',
+          background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+          animation: 'float 20s infinite',
+          pointerEvents: 'none'
+        }} />
+        <div style={{
+          position: 'fixed',
+          bottom: '-50%',
+          right: '-50%',
+          width: '200%',
+          height: '200%',
+          background: 'radial-gradient(circle at 70% 50%, rgba(255,255,255,0.08) 0%, transparent 50%)',
+          animation: 'float 25s infinite reverse',
+          pointerEvents: 'none'
+        }} />
+
+        <div style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)',
+          padding: '45px 40px',
+          borderRadius: '20px',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+          width: '100%',
+          maxWidth: '420px',
+          position: 'relative',
+          zIndex: 1,
+          animation: 'slideUp 0.5s ease-out'
+        }}>
+          {/* Logo/Brand */}
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <div style={{
+              width: '70px',
+              height: '70px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 15px',
+              fontSize: '30px',
+              color: 'white',
+              boxShadow: '0 10px 30px rgba(102, 126, 234, 0.4)'
+            }}>
+              <i className="fa-regular fa-circle-dot"></i>
+            </div>
+            <h1 style={{ 
+              margin: 0, 
+              fontSize: '28px', 
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+              MxRollover
+            </h1>
+            <p style={{ 
+              margin: '5px 0 0', 
+              color: '#94a3b8', 
+              fontSize: '14px',
+              fontWeight: '300'
+            }}>
+              {authMode === 'login' ? 'Welcome back!' : 'Create your account'}
+            </p>
+          </div>
+
+          {/* Toggle Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            marginBottom: '25px', 
+            gap: '10px',
+            background: '#f1f5f9',
+            padding: '5px',
+            borderRadius: '12px'
+          }}>
+            <button
+              onClick={() => { setAuthMode('login'); setAuthError(''); }}
+              style={{
+                flex: 1,
+                padding: '12px',
+                background: authMode === 'login' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+                color: authMode === 'login' ? 'white' : '#64748b',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '15px',
+                transition: 'all 0.3s ease',
+                boxShadow: authMode === 'login' ? '0 4px 15px rgba(102, 126, 234, 0.4)' : 'none'
+              }}
+            >
+              <i className="fas fa-sign-in-alt" style={{ marginRight: '8px' }}></i>
+              Login
+            </button>
+            <button
+              onClick={() => { setAuthMode('register'); setAuthError(''); }}
+              style={{
+                flex: 1,
+                padding: '12px',
+                background: authMode === 'register' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+                color: authMode === 'register' ? 'white' : '#64748b',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '15px',
+                transition: 'all 0.3s ease',
+                boxShadow: authMode === 'register' ? '0 4px 15px rgba(102, 126, 234, 0.4)' : 'none'
+              }}
+            >
+              <i className="fas fa-user-plus" style={{ marginRight: '8px' }}></i>
+              Register
+            </button>
+          </div>
+
+          {/* Error Message */}
+          {authError && (
+            <div style={{
+              background: 'linear-gradient(135deg, #fecaca 0%, #fca5a5 100%)',
+              color: '#991b1b',
+              padding: '12px 15px',
+              borderRadius: '10px',
+              marginBottom: '20px',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              border: '1px solid #f87171'
+            }}>
+              <i className="fas fa-exclamation-circle"></i>
+              <span>{authError}</span>
+            </div>
+          )}
+
+          {/* Auth Form */}
+          <form onSubmit={authMode === 'login' ? handleLogin : handleRegister}>
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '6px', 
+                color: '#334155', 
+                fontWeight: '600',
+                fontSize: '14px'
+              }}>
+                <i className="fas fa-user" style={{ marginRight: '8px', color: '#667eea' }}></i>
+                Username
+              </label>
+              <input
+                type="text"
+                value={authUsername}
+                onChange={(e) => setAuthUsername(e.target.value)}
+                placeholder="Enter your username"
+                style={{
+                  width: '100%',
+                  padding: '12px 15px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '10px',
+                  fontSize: '1rem',
+                  boxSizing: 'border-box',
+                  transition: 'all 0.3s ease',
+                  background: '#f8fafc',
+                  outline: 'none'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#667eea';
+                  e.target.style.background = 'white';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.background = '#f8fafc';
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: authMode === 'register' ? '18px' : '25px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '6px', 
+                color: '#334155', 
+                fontWeight: '600',
+                fontSize: '14px'
+              }}>
+                <i className="fas fa-lock" style={{ marginRight: '8px', color: '#667eea' }}></i>
+                Password
+              </label>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="Enter your password"
+                style={{
+                  width: '100%',
+                  padding: '12px 15px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '10px',
+                  fontSize: '1rem',
+                  boxSizing: 'border-box',
+                  transition: 'all 0.3s ease',
+                  background: '#f8fafc',
+                  outline: 'none'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#667eea';
+                  e.target.style.background = 'white';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.background = '#f8fafc';
+                }}
+              />
+            </div>
+
+            {authMode === 'register' && (
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '6px', 
+                  color: '#334155', 
+                  fontWeight: '600',
+                  fontSize: '14px'
+                }}>
+                  <i className="fas fa-check-circle" style={{ marginRight: '8px', color: '#667eea' }}></i>
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  value={authConfirmPassword}
+                  onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  style={{
+                    width: '100%',
+                    padding: '12px 15px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    background: '#f8fafc',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#667eea';
+                    e.target.style.background = 'white';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e2e8f0';
+                    e.target.style.background = '#f8fafc';
+                  }}
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={authLoading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: authLoading 
+                  ? '#cbd5e1' 
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: authLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                if (!authLoading) {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!authLoading) {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                }
+              }}
+            >
+              {authLoading ? (
+                <>
+                  <i className="fas fa-spinner fa-spin" style={{ marginRight: '10px' }}></i>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {authMode === 'login' ? (
+                    <>
+                      <i className="fas fa-sign-in-alt" style={{ marginRight: '10px' }}></i>
+                      Login
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-user-plus" style={{ marginRight: '10px' }}></i>
+                      Create Account
+                    </>
+                  )}
+                </>
+              )}
+            </button>
+
+            {/* Switch mode link */}
+            <div style={{ textAlign: 'center', marginTop: '18px' }}>
+              <span style={{ color: '#94a3b8', fontSize: '14px' }}>
+                {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
+                <span
+                  onClick={() => {
+                    setAuthMode(authMode === 'login' ? 'register' : 'login');
+                    setAuthError('');
+                  }}
+                  style={{
+                    color: '#667eea',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    transition: 'color 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = '#764ba2'}
+                  onMouseLeave={(e) => e.target.style.color = '#667eea'}
+                >
+                  {authMode === 'login' ? 'Sign Up' : 'Sign In'}
+                </span>
+              </span>
+            </div>
+          </form>
+        </div>
+
+        {/* CSS Animations */}
+        <style>
+          {`
+            @keyframes float {
+              0% { transform: translate(0, 0) rotate(0deg); }
+              33% { transform: translate(10%, -10%) rotate(5deg); }
+              66% { transform: translate(-5%, 5%) rotate(-3deg); }
+              100% { transform: translate(0, 0) rotate(0deg); }
+            }
+            
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+          `}
+        </style>
+      </div>
+    );
+  }
 
   // ==== REST OF YOUR APP (UNTOUCHED) ====
   return (
@@ -629,7 +1012,6 @@ function App() {
                   <p style={{ color: '#64748b', textAlign: 'center', padding: '20px', fontSize: '0.85rem' }}>No historical data records verified yet.</p>
                 ) : (
                   rolloverRuns.map(run => {
-                    // Filter down won/lost steps to present a clean archival summary card
                     const settledSteps = run.steps ? run.steps.filter(s => s.status === 'win' || s.status === 'loss') : [];
                     return (
                       <div className="history-dropdown-card" key={run.id}>
